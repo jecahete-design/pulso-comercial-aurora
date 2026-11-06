@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cerrarSesion } from "@/app/login/acciones";
-import type { Usuario } from "@/lib/tipos";
+import { NOMBRE_ROL, type Usuario } from "@/lib/tipos";
 
 export function Encabezado({
   usuario,
@@ -27,7 +27,7 @@ export function Encabezado({
           ))}
         </nav>
         <span className="text-sm text-slate-600">
-          {usuario.nombre} · {usuario.rol === "gerente" ? "Gerente" : "Vendedor"}
+          {usuario.nombre} · {NOMBRE_ROL[usuario.rol]}
         </span>
         <form action={cerrarSesion}>
           <button type="submit" className="boton-secundario">

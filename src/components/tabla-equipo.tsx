@@ -6,6 +6,47 @@ import { calcularResultados, type VistaPulso } from "@/lib/pulso/motor";
 
 export type FilaTabla = { id: string; nombre: string; vista: VistaPulso };
 
+// Parte de un total, en porcentaje; null si el total es cero.
+function participacion(valor: number, total: number) {
+  return total > 0 ? (valor / total) * 100 : null;
+}
+
+// Compara el peso de la meta de cada persona con lo que aporta a las ventas
+// del equipo: quien aporta más que su peso está cargando al equipo.
+function ComparacionMetas({
+  meta,
+  vendido,
+  metaEquipo,
+  vendidoEquipo,
+}: {
+  meta: number | null;
+  vendido: number;
+  metaEquipo: number;
+  vendidoEquipo: number;
+}) {
+  const peso = participacion(meta ?? 0, metaEquipo);
+  const aporte = participacion(vendido, vendidoEquipo);
+  if (meta === null || peso === null) {
+    return <span className="text-slate-400">Sin meta</span>;
+  }
+  return (
+    <div className="min-w-40">
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-indigo-500"
+          style={{ width: `${peso}%` }}
+        />
+      </div>
+      <div className="mt-1 text-xs text-slate-700">
+        {porcentaje(peso)} de la meta del equipo
+      </div>
+      <div className="text-xs text-slate-500">
+        Aporta {porcentaje(aporte)} de las ventas
+      </div>
+    </div>
+  );
+}
+
 // Totales del equipo y tabla "Pulso del equipo" del dashboard gerencial.
 // La meta del equipo es la suma de las metas individuales del período.
 export function TablaEquipo({
@@ -55,20 +96,22 @@ export function TablaEquipo({
         <h2 className="mb-3 font-medium">Pulso del equipo</h2>
         {filas.length === 0 ? (
           <p className="text-sm text-slate-600">
-            Todavía no hay vendedores activos. Créalos en Usuarios.
+            Todavía no hay desarrolladores de negocios activos. Créalos en
+            Usuarios.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-slate-500">
                 <tr>
-                  <th className="pb-2 font-medium">Vendedor</th>
+                  <th className="pb-2 font-medium">Desarrollador de Negocios</th>
                   <th className="pb-2 font-medium">Actividad hoy</th>
                   <th className="pb-2 font-medium">Actividad semana</th>
                   <th className="pb-2 text-right font-medium">Ventas</th>
                   <th className="pb-2 text-right font-medium">Meta</th>
                   <th className="pb-2 text-right font-medium">Cumplimiento</th>
                   <th className="pb-2 pl-4 font-medium">Resultados</th>
+                  <th className="pb-2 pl-4 font-medium">Comparación de metas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -105,6 +148,14 @@ export function TablaEquipo({
                     </td>
                     <td className="py-2.5 pl-4">
                       <Semaforo estado={vista.resultados.estado} />
+                    </td>
+                    <td className="py-2.5 pl-4">
+                      <ComparacionMetas
+                        meta={vista.resultados.meta}
+                        vendido={vista.resultados.vendido}
+                        metaEquipo={meta}
+                        vendidoEquipo={vendido}
+                      />
                     </td>
                   </tr>
                 ))}

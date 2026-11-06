@@ -58,7 +58,8 @@ export default async function PaginaMetas(props: PageProps<"/gerente/metas">) {
       <div className="flex flex-col gap-6">
         <h1 className="text-xl font-semibold">Configuración de metas</h1>
         <p className="tarjeta text-sm text-slate-600">
-          Todavía no hay vendedores activos. Créalos primero en Usuarios.
+          Todavía no hay desarrolladores de negocios activos. Créalos primero en
+          Usuarios.
         </p>
       </div>
     );
@@ -85,7 +86,7 @@ export default async function PaginaMetas(props: PageProps<"/gerente/metas">) {
         <form className="flex flex-wrap items-end gap-3">
           <div className="min-w-48 flex-1">
             <label htmlFor="vendedor" className="etiqueta">
-              Vendedor
+              Desarrollador de Negocios
             </label>
             <select
               id="vendedor"
@@ -198,7 +199,7 @@ export default async function PaginaMetas(props: PageProps<"/gerente/metas">) {
             </table>
             <p className="mt-2 text-xs text-slate-500">
               Deja un campo vacío si esa actividad no tiene meta para este
-              vendedor.
+              desarrollador de negocios.
             </p>
           </fieldset>
 

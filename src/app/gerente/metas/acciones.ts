@@ -25,7 +25,7 @@ export async function guardarMetas(
   const anio = Number(datos.get("anio"));
   const mes = Number(datos.get("mes"));
   if (!vendedorId || !Number.isInteger(anio) || !Number.isInteger(mes)) {
-    return { error: "Elige un vendedor y un período." };
+    return { error: "Elige un desarrollador de negocios y un período." };
   }
 
   const textoMonto = String(datos.get("monto") ?? "").trim();
