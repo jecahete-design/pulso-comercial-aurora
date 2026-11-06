@@ -1,7 +1,7 @@
 import { BotonEnviar, Formulario } from "@/components/formulario";
 import { requerirRol } from "@/lib/sesion";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import type { Usuario } from "@/lib/tipos";
+import { NOMBRE_ROL, type Usuario } from "@/lib/tipos";
 import {
   actualizarUsuario,
   cambiarEstadoUsuario,
@@ -21,7 +21,7 @@ export default async function PaginaUsuarios() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Vendedores y usuarios</h1>
+      <h1 className="text-xl font-semibold">Desarrolladores de Negocios y usuarios</h1>
 
       <section className="tarjeta">
         <h2 className="mb-3 font-medium">Nuevo usuario</h2>
@@ -63,8 +63,8 @@ export default async function PaginaUsuarios() {
               defaultValue="vendedor"
               className="campo"
             >
-              <option value="vendedor">Vendedor</option>
-              <option value="gerente">Gerente</option>
+              <option value="vendedor">{NOMBRE_ROL.vendedor}</option>
+              <option value="gerente">{NOMBRE_ROL.gerente}</option>
             </select>
           </div>
           <div>
@@ -107,7 +107,7 @@ export default async function PaginaUsuarios() {
                 <span className="text-sm text-slate-600">{u.correo}</span>
               </Formulario>
               <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
-                {u.rol === "gerente" ? "Gerente" : "Vendedor"}
+                {NOMBRE_ROL[u.rol]}
               </span>
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${

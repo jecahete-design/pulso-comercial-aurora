@@ -19,8 +19,9 @@ export default async function PaginaLogin() {
         </p>
         {!supabaseConfigurado() && (
           <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            Falta conectar la base de datos: crea el archivo .env.local a partir
-            de .env.example.
+            Falta conectar la base de datos: configura las variables de
+            Supabase (en tu equipo, el archivo .env.local; en Vercel, Settings →
+            Environment Variables para este entorno).
           </p>
         )}
         <Formulario accion={iniciarSesion} className="flex flex-col gap-4">
