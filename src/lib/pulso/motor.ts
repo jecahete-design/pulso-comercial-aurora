@@ -52,12 +52,12 @@ export type FilaVenta = {
   cliente: string;
   producto: string;
   monto: number;
+  notas?: string | null;
 };
 export type FilaMetaVenta = Periodo & { monto: number };
 export type FilaMetaActividad = Periodo & {
   actividad: Actividad;
   meta_diaria: number | null;
-  meta_semanal: number | null;
 };
 
 export type LecturaActividad = {
@@ -152,16 +152,21 @@ type Contexto = {
   metasActividad: FilaMetaActividad[];
 };
 
-function metaDe(
-  ctx: Contexto,
-  periodo: Periodo,
-  actividad: Actividad,
-  campo: "meta_diaria" | "meta_semanal",
-) {
+// Solo se carga la meta diaria; la semanal y la mensual se derivan de ella.
+function metaDiariaDe(ctx: Contexto, periodo: Periodo, actividad: Actividad) {
   const fila = ctx.metasActividad.find(
     (m) => mismoPeriodo(m, periodo) && m.actividad === actividad,
   );
-  return fila?.[campo] ?? null;
+  return fila?.meta_diaria ?? null;
+}
+
+// Días laborales de un mes, para mostrar la meta mensual de actividad.
+export function diasLaboralesDelMes(periodo: Periodo, diasLaborales: number[]) {
+  let total = 0;
+  for (let dia = 1; dia <= diasDelMes(periodo); dia++) {
+    if (diasLaborales.includes(diaISO(fechaDe(periodo, dia)))) total++;
+  }
+  return total;
 }
 
 export function calcularDia(ctx: Contexto, fecha: string): PulsoDia {
@@ -170,7 +175,7 @@ export function calcularDia(ctx: Contexto, fecha: string): PulsoDia {
   const fila = ctx.actividades.find((a) => a.fecha === fecha);
   const detalle = ACTIVIDADES.map((actividad): LecturaActividad => {
     const realizado = fila?.[actividad] ?? 0;
-    const meta = metaDe(ctx, periodoDe(fecha), actividad, "meta_diaria");
+    const meta = metaDiariaDe(ctx, periodoDe(fecha), actividad);
     if (meta === null) {
       return { actividad, realizado, meta, cumplimiento: null, estado: "sin_meta" };
     }
@@ -196,7 +201,8 @@ export function calcularDia(ctx: Contexto, fecha: string): PulsoDia {
 }
 
 // Semana de lunes a domingo, leída a la fecha de corte. La meta semanal es la
-// vigente el lunes, aunque la semana cruce a otro mes.
+// diaria vigente el lunes (aunque la semana cruce a otro mes) por los días
+// laborales de la semana: con lunes a viernes, la diaria por 5.
 export function calcularSemana(
   ctx: Contexto,
   lunes: string,
@@ -221,7 +227,8 @@ export function calcularSemana(
   );
   const detalle = ACTIVIDADES.map((actividad): LecturaActividad => {
     const realizado = filas.reduce((s, f) => s + f[actividad], 0);
-    const meta = metaDe(ctx, periodoDe(lunes), actividad, "meta_semanal");
+    const diaria = metaDiariaDe(ctx, periodoDe(lunes), actividad);
+    const meta = diaria === null || laborales === 0 ? null : diaria * laborales;
     if (meta === null) {
       return { actividad, realizado, meta, cumplimiento: null, estado: "sin_meta" };
     }
