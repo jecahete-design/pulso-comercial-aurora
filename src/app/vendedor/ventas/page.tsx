@@ -103,6 +103,19 @@ export default async function PaginaVentas() {
                 className="campo"
               />
             </div>
+            <div className="sm:col-span-2 lg:col-span-4">
+              <label htmlFor="notas" className="etiqueta">
+                Notas (opcional)
+              </label>
+              <textarea
+                id="notas"
+                name="notas"
+                rows={2}
+                maxLength={500}
+                placeholder="Algo adicional sobre esta venta"
+                className="campo resize-y"
+              />
+            </div>
             <BotonEnviar>Registrar venta</BotonEnviar>
           </Formulario>
         )}
@@ -125,6 +138,7 @@ export default async function PaginaVentas() {
                   <th className="pb-2 font-medium">Cliente</th>
                   <th className="pb-2 font-medium">Producto</th>
                   <th className="pb-2 text-right font-medium">Monto</th>
+                  <th className="pb-2 pl-4 font-medium">Notas</th>
                   <th className="pb-2" />
                 </tr>
               </thead>
@@ -137,6 +151,7 @@ export default async function PaginaVentas() {
                     <td className="py-2 text-right">
                       {dinero(v.monto, config.moneda)}
                     </td>
+                    <td className="max-w-64 py-2 pl-4 text-slate-600">{v.notas ?? "—"}</td>
                     <td className="py-2 text-right">
                       <form action={eliminarVenta}>
                         <input type="hidden" name="id" value={v.id} />

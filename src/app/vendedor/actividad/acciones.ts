@@ -21,7 +21,11 @@ export async function guardarActividad(
   if (fecha > hoy) return { error: "No puedes registrar actividad de días futuros." };
 
   const valores: Record<string, number> = {};
+  const notas: Record<string, string> = {};
   for (const actividad of ACTIVIDADES) {
+    const nota = String(datos.get(`nota_${actividad}`) ?? "").trim();
+    if (nota.length > 500) return { error: "Cada nota admite hasta 500 caracteres." };
+    if (nota) notas[actividad] = nota;
     const texto = String(datos.get(actividad) ?? "").trim();
     const n = texto === "" ? 0 : Number(texto);
     if (!Number.isInteger(n) || n < 0) {
@@ -36,6 +40,7 @@ export async function guardarActividad(
       vendedor_id: usuario.id,
       fecha,
       ...valores,
+      notas,
       actualizado_en: new Date().toISOString(),
     },
     { onConflict: "vendedor_id,fecha" },

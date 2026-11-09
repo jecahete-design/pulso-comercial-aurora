@@ -11,6 +11,9 @@ import {
   sumarDias,
 } from "./pulso/fechas";
 import {
+  ACTIVIDADES,
+  type Actividad,
+  NOMBRE_ACTIVIDAD,
   type FilaActividad,
   type FilaMetaActividad,
   type FilaMetaVenta,
@@ -28,19 +31,21 @@ export type Configuracion = {
   dias_laborales: number[];
   zona_horaria: string;
   moneda: string;
+  horas_jornada: number;
 };
 
 const POR_DEFECTO: Configuracion = {
   dias_laborales: [1, 2, 3, 4, 5],
   zona_horaria: "America/Panama",
   moneda: "USD",
+  horas_jornada: 8,
 };
 
 export const obtenerConfiguracion = cache(async (): Promise<Configuracion> => {
   const supabase = await crearClienteServidor();
   const { data } = await supabase
     .from("configuracion")
-    .select("dias_laborales, zona_horaria, moneda")
+    .select("dias_laborales, zona_horaria, moneda, horas_jornada")
     .maybeSingle<Configuracion>();
   return data ?? POR_DEFECTO;
 });
@@ -55,6 +60,7 @@ type VentaBD = {
   fecha: string;
   cliente: string;
   monto: number;
+  notas: string | null;
   productos: { nombre: string } | null;
 };
 
@@ -77,10 +83,11 @@ async function cargarVistas(
   const hasta = sumarDias(lunesDe(finMes(periodo)), 6);
   const previo = periodoAnterior(periodo);
 
-  const [ventas, actividades, metasVentas, metasActividad] = await Promise.all([
+  const periodos = [periodo, previo];
+  const [ventas, actividades, metas] = await Promise.all([
     supabase
       .from("ventas")
-      .select("id, vendedor_id, fecha, cliente, monto, productos(nombre)")
+      .select("id, vendedor_id, fecha, cliente, monto, notas, productos(nombre)")
       .in("vendedor_id", vendedorIds)
       .gte("fecha", desde)
       .lte("fecha", finMes(periodo))
@@ -92,22 +99,8 @@ async function cargarVistas(
       .gte("fecha", lunesDe(desde))
       .lte("fecha", hasta)
       .returns<(FilaActividad & { vendedor_id: string })[]>(),
-    supabase
-      .from("metas_ventas")
-      .select("vendedor_id, anio, mes, monto")
-      .in("vendedor_id", vendedorIds)
-      .eq("anio", periodo.anio)
-      .eq("mes", periodo.mes)
-      .returns<(FilaMetaVenta & { vendedor_id: string })[]>(),
-    supabase
-      .from("metas_actividad")
-      .select("vendedor_id, anio, mes, actividad, meta_diaria, meta_semanal")
-      .in("vendedor_id", vendedorIds)
-      .in("anio", [periodo.anio, previo.anio])
-      .in("mes", [periodo.mes, previo.mes])
-      .returns<(FilaMetaActividad & { vendedor_id: string })[]>(),
+    leerMetas(periodos, vendedorIds),
   ]);
-
   for (const id of vendedorIds) {
     vistas.set(
       id,
@@ -124,21 +117,157 @@ async function cargarVistas(
               cliente: v.cliente,
               producto: v.productos?.nombre ?? "—",
               monto: Number(v.monto),
+              notas: v.notas,
             }),
           ),
         actividades: (actividades.data ?? []).filter((a) => a.vendedor_id === id),
-        metasVentas: (metasVentas.data ?? [])
-          .filter((m) => m.vendedor_id === id)
-          .map((m) => ({ ...m, monto: Number(m.monto) })),
-        metasActividad: (metasActividad.data ?? []).filter(
-          (m) =>
-            m.vendedor_id === id &&
-            (mismoPeriodo(m, periodo) || mismoPeriodo(m, previo)),
-        ),
+        ...metasEfectivas(metas, id, periodos),
       }),
     );
   }
   return vistas;
+}
+
+// ---------------------------------------------------------------------------
+// Metas: una general por período para todo el equipo, más el incremento que el
+// gerente le asigne a un vendedor en particular.
+// ---------------------------------------------------------------------------
+
+export type MetaGeneralActividad = Periodo & { actividad: Actividad; meta_diaria: number };
+export type AjusteActividad = Periodo & {
+  vendedor_id: string;
+  actividad: Actividad;
+  incremento_diario: number;
+};
+export type MetasLeidas = {
+  generalesVentas: (Periodo & { monto: number })[];
+  generalesActividad: MetaGeneralActividad[];
+  ajustesVentas: (Periodo & { vendedor_id: string; incremento: number })[];
+  ajustesActividad: AjusteActividad[];
+};
+
+// Lee metas generales y ajustes de los períodos pedidos. Con RLS, un vendedor
+// solo recibe sus propios ajustes.
+export async function leerMetas(
+  periodos: Periodo[],
+  vendedorIds: string[],
+): Promise<MetasLeidas> {
+  const supabase = await crearClienteServidor();
+  const anios = [...new Set(periodos.map((p) => p.anio))];
+  const meses = [...new Set(periodos.map((p) => p.mes))];
+  const delPeriodo = <T extends Periodo>(filas: T[] | null) =>
+    (filas ?? []).filter((f) => periodos.some((p) => mismoPeriodo(f, p)));
+
+  const [gv, ga, av, aa] = await Promise.all([
+    supabase
+      .from("metas_generales_ventas")
+      .select("anio, mes, monto")
+      .in("anio", anios)
+      .in("mes", meses)
+      .returns<(Periodo & { monto: number })[]>(),
+    supabase
+      .from("metas_generales_actividad")
+      .select("anio, mes, actividad, meta_diaria")
+      .in("anio", anios)
+      .in("mes", meses)
+      .returns<MetaGeneralActividad[]>(),
+    supabase
+          .from("ajustes_meta_ventas")
+          .select("vendedor_id, anio, mes, incremento")
+          .in("vendedor_id", vendedorIds)
+          .in("anio", anios)
+          .in("mes", meses)
+          .returns<(Periodo & { vendedor_id: string; incremento: number })[]>(),
+    supabase
+          .from("ajustes_meta_actividad")
+          .select("vendedor_id, anio, mes, actividad, incremento_diario")
+          .in("vendedor_id", vendedorIds)
+          .in("anio", anios)
+          .in("mes", meses)
+          .returns<AjusteActividad[]>(),
+  ]);
+  return {
+    generalesVentas: delPeriodo(gv.data).map((m) => ({ ...m, monto: Number(m.monto) })),
+    generalesActividad: delPeriodo(ga.data),
+    ajustesVentas: delPeriodo(av.data).map((m) => ({
+      ...m,
+      incremento: Number(m.incremento),
+    })),
+    ajustesActividad: delPeriodo(aa.data),
+  };
+}
+
+// Meta de cada vendedor = general + su ajuste. Sin general ni ajuste: sin meta.
+export function metasEfectivas(
+  metas: MetasLeidas,
+  vendedorId: string,
+  periodos: Periodo[],
+): { metasVentas: FilaMetaVenta[]; metasActividad: FilaMetaActividad[] } {
+  const metasVentas: FilaMetaVenta[] = [];
+  const metasActividad: FilaMetaActividad[] = [];
+  for (const p of periodos) {
+    const general = metas.generalesVentas.find((m) => mismoPeriodo(m, p))?.monto ?? 0;
+    const ajuste =
+      metas.ajustesVentas.find((m) => m.vendedor_id === vendedorId && mismoPeriodo(m, p))
+        ?.incremento ?? 0;
+    if (general + ajuste > 0) {
+      metasVentas.push({ ...p, monto: Math.round((general + ajuste) * 100) / 100 });
+    }
+    for (const actividad of ACTIVIDADES) {
+      const diaria =
+        metas.generalesActividad.find(
+          (m) => mismoPeriodo(m, p) && m.actividad === actividad,
+        )?.meta_diaria ?? 0;
+      const extra =
+        metas.ajustesActividad.find(
+          (m) =>
+            m.vendedor_id === vendedorId &&
+            mismoPeriodo(m, p) &&
+            m.actividad === actividad,
+        )?.incremento_diario ?? 0;
+      if (diaria + extra > 0) {
+        metasActividad.push({ ...p, actividad, meta_diaria: diaria + extra });
+      }
+    }
+  }
+  return { metasVentas, metasActividad };
+}
+
+// Notas que dejó el vendedor en el período, de la más reciente a la más antigua.
+export type Nota = { fecha: string; campo: string; texto: string };
+
+export async function cargarNotas(vendedorId: string, periodo: Periodo): Promise<Nota[]> {
+  const supabase = await crearClienteServidor();
+  const [actividades, ventas] = await Promise.all([
+    supabase
+      .from("actividades")
+      .select("fecha, notas")
+      .eq("vendedor_id", vendedorId)
+      .gte("fecha", inicioMes(periodo))
+      .lte("fecha", finMes(periodo))
+      .returns<{ fecha: string; notas: Partial<Record<Actividad, string>> | null }[]>(),
+    supabase
+      .from("ventas")
+      .select("fecha, cliente, notas")
+      .eq("vendedor_id", vendedorId)
+      .gte("fecha", inicioMes(periodo))
+      .lte("fecha", finMes(periodo))
+      .not("notas", "is", null)
+      .returns<{ fecha: string; cliente: string; notas: string }[]>(),
+  ]);
+  const notas: Nota[] = [];
+  for (const fila of actividades.data ?? []) {
+    for (const actividad of ACTIVIDADES) {
+      const texto = fila.notas?.[actividad]?.trim();
+      if (texto) notas.push({ fecha: fila.fecha, campo: NOMBRE_ACTIVIDAD[actividad], texto });
+    }
+  }
+  for (const venta of ventas.data ?? []) {
+    if (venta.notas.trim()) {
+      notas.push({ fecha: venta.fecha, campo: `Venta · ${venta.cliente}`, texto: venta.notas });
+    }
+  }
+  return notas.sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
 export async function cargarVista(vendedorId: string, periodo: Periodo) {

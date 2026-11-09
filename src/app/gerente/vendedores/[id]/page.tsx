@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SelectorPeriodo } from "@/components/selector-periodo";
 import { VistaPulso } from "@/components/vista-pulso";
-import { cargarVista, obtenerConfiguracion, periodoActual } from "@/lib/datos";
-import { nombrePeriodo } from "@/lib/formato";
+import { cargarNotas, cargarVista, obtenerConfiguracion, periodoActual } from "@/lib/datos";
+import { fechaCorta, nombrePeriodo } from "@/lib/formato";
 import { uno } from "@/lib/parametros";
 import { leerPeriodo, textoPeriodo } from "@/lib/pulso/fechas";
 import { requerirRol } from "@/lib/sesion";
@@ -29,7 +29,10 @@ export default async function DetalleVendedor(
   if (!vendedor) notFound();
 
   const periodo = leerPeriodo(uno(params.periodo), actual);
-  const vista = await cargarVista(id, periodo);
+  const [vista, notas] = await Promise.all([
+    cargarVista(id, periodo),
+    cargarNotas(id, periodo),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,6 +64,22 @@ export default async function DetalleVendedor(
         </div>
       </div>
       <VistaPulso vista={vista} moneda={config.moneda} />
+      <section className="tarjeta">
+        <h2 className="mb-3 font-medium">Notas de {vendedor.nombre}</h2>
+        {notas.length === 0 ? (
+          <p className="text-sm text-slate-600">No dejó notas en este período.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 text-sm">
+            {notas.map((n, i) => (
+              <li key={i} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:gap-4">
+                <span className="w-24 shrink-0 text-slate-500">{fechaCorta(n.fecha)}</span>
+                <span className="w-48 shrink-0 font-medium">{n.campo}</span>
+                <span className="whitespace-pre-line text-slate-700">{n.texto}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

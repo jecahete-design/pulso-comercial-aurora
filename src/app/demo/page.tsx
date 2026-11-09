@@ -25,7 +25,6 @@ function vendedorDemo(
       ...p,
       actividad,
       meta_diaria: [20, 3, 2, 2, 10, 4][i],
-      meta_semanal: [100, 15, 10, 10, 50, 20][i],
     })),
   );
   const actividades: FilaActividad[] = [];

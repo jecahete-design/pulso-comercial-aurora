@@ -8,6 +8,7 @@ import {
   calcularResultados,
   calcularSemana,
   construirVista,
+  diasLaboralesDelMes,
   semaforoRitmo,
 } from "./motor";
 
@@ -30,14 +31,12 @@ function actividad(fecha: string, valores: Partial<FilaActividad> = {}): FilaAct
 function metas(
   periodo: { anio: number; mes: number },
   diaria: number | null,
-  semanal: number | null,
   actividades: readonly (typeof ACTIVIDADES)[number][] = ACTIVIDADES,
 ): FilaMetaActividad[] {
   return actividades.map((a) => ({
     ...periodo,
     actividad: a,
     meta_diaria: diaria,
-    meta_semanal: semanal,
   }));
 }
 
@@ -108,7 +107,7 @@ describe("resultados mensuales", () => {
 });
 
 describe("actividad diaria", () => {
-  const base = { diasLaborales: LV, metasActividad: metas(OCT, 20, 100) };
+  const base = { diasLaborales: LV, metasActividad: metas(OCT, 20) };
 
   it("un día sin terminar queda en curso, no en rojo", () => {
     const d = calcularDia(
@@ -153,7 +152,7 @@ describe("actividad diaria", () => {
     const ctx = {
       hoy: "2026-10-07",
       diasLaborales: LV,
-      metasActividad: metas(OCT, 10, 50, ["llamadas", "visitas"]),
+      metasActividad: metas(OCT, 10, ["llamadas", "visitas"]),
       actividades: [actividad("2026-10-06", { llamadas: 30, visitas: 5 })],
     };
     const d = calcularDia(ctx, "2026-10-06");
@@ -177,7 +176,7 @@ describe("actividad diaria", () => {
 });
 
 describe("actividad semanal", () => {
-  const base = { hoy: "2026-10-09", diasLaborales: LV, metasActividad: metas(OCT, 20, 100) };
+  const base = { hoy: "2026-10-09", diasLaborales: LV, metasActividad: metas(OCT, 20) };
   const todas = (n: number) => ({
     llamadas: n, reuniones: n, visitas: n, propuestas: n, seguimientos: n, prospectos: n,
   });
@@ -264,7 +263,7 @@ describe("actividad semanal", () => {
       {
         hoy: "2026-10-02",
         diasLaborales: LV,
-        metasActividad: [...metas(sep, 10, 50), ...metas(OCT, 20, 100)],
+        metasActividad: [...metas(sep, 10), ...metas(OCT, 20)],
         actividades: [actividad("2026-09-28", todas(25)), actividad("2026-10-01", todas(25))],
       },
       "2026-09-28",
@@ -288,7 +287,7 @@ describe("vista completa", () => {
     ],
     actividades: [actividad("2026-10-05", { llamadas: 10 })],
     metasVentas: [{ ...OCT, monto: 25000 }, { anio: 2026, mes: 9, monto: 10000 }],
-    metasActividad: metas(OCT, 20, 100),
+    metasActividad: metas(OCT, 20),
   };
 
   it("solo cuenta las ventas del período", () => {
@@ -326,5 +325,21 @@ describe("vista completa", () => {
     expect(v.semanas.map((s) => s.lunes)).toEqual([
       "2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28",
     ]);
+  });
+});
+
+describe("metas derivadas de la diaria", () => {
+  it("la semanal es la diaria por 5 días laborales", () => {
+    const semana = calcularSemana(
+      { hoy: "2026-10-12", diasLaborales: LV, metasActividad: metas(OCT, 20), actividades: [] },
+      "2026-10-05",
+      "2026-10-11",
+    );
+    expect(semana.detalle[0].meta).toBe(100);
+  });
+
+  it("la mensual usa los días laborales del mes", () => {
+    expect(diasLaboralesDelMes(OCT, LV)).toBe(22);
+    expect(diasLaboralesDelMes({ anio: 2026, mes: 2 }, LV)).toBe(20);
   });
 });
